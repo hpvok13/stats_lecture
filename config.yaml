@@ -1,11 +1,11 @@
 # Configuration for Stock Price Estimation Model Training
 model:
   input_dim: 5
-  d_model: 512
+  d_model: 64
   max_len: 1000
   num_heads: 8
   num_layers: 6
-  ff_dim: 1024
+  ff_dim: 128
   dropout: 0.1
   activation: gelu
   layer_norm_eps: 0.00001
