@@ -95,13 +95,12 @@ def eval_epoch(
     test_loss = 0.0
 
     with torch.no_grad():
-        for images, labels in test_loader:
-            images = images.to(device)
-            labels = labels.to(device)
+        for seq in test_loader:
+            seq = seq.to(device)
 
             # Forward pass
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            outputs = model(seq)
+            loss = criterion(outputs, seq)
 
             # Update statistics
             test_loss += loss.item()
