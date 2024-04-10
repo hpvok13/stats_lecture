@@ -18,7 +18,7 @@ dataset:
   dir: "data"
   period: "60d"
   interval: "2m"
-  download: True
+  download: False
   columns: ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 optimizer: 
   fn: adam
@@ -27,7 +27,7 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: mse_loss
-wandb: False
+wandb: True
 compile:
   disable: True
   fullgraph: True
