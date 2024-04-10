@@ -11,4 +11,4 @@
 source ~/.bashrc
 conda activate pytorch
 
-python src/price_predictor/trainer.py --config config.yaml
+python -u src/price_predictor/train.py --config config.yaml

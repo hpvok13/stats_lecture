@@ -18,7 +18,7 @@ dataset:
   dir: "data"
   period: "60d"
   interval: "2m"
-  download: False
+  download: True
   columns: ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 optimizer: 
   fn: adam
@@ -37,6 +37,6 @@ compile:
 train:
   epochs: 30
   batch_size: 32
-  num_workers: 0
+  num_workers: 4
   log_freq: 50
   model_dir: models
