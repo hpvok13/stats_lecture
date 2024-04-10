@@ -1,5 +1,5 @@
 import os
-from bisect import bisect_left
+from bisect import bisect
 from warnings import warn
 
 import pandas as pd
@@ -72,7 +72,7 @@ class StockDataset(Dataset):
         return self.cum_len_tables[-1]
 
     def __getitem__(self, idx):
-        table_idx = bisect_left(self.cum_len_tables, idx)
+        table_idx = bisect(self.cum_len_tables, idx)
         assert table_idx < len(self.cum_len_tables)
         row_idx = idx - self.cum_len_tables[table_idx - 1] if table_idx > 0 else idx
         symbol = self.symbols[table_idx]
