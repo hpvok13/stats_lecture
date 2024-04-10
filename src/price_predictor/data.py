@@ -80,6 +80,7 @@ class StockDataset(Dataset):
             os.path.join(self.dir, f"{symbol}.csv"),
             skiprows=row_idx,
             nrows=self.seq_len,
+            header=0,
             names=self.columns,
         )
         table = table.drop(columns="Datetime")
