@@ -29,12 +29,13 @@ optimizer:
 criterion: mse_loss
 wandb: True
 compile:
-  disable: True
+  disable: False
   fullgraph: True
   dynamic: null
   backend: inductor
   mode: "max-autotune"
 train:
+  matmul_precision: high
   epochs: 30
   batch_size: 32
   num_workers: 4

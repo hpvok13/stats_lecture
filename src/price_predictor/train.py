@@ -22,7 +22,7 @@ def train_epoch(
     wandb_log: Callable[[dict[str, float, int]], None],
     epoch: int,
     device: torch.device,
-) -> tuple[float, float]:
+) -> float:
     model.train()
     train_loss = 0.0
     running_loss = 0.0
@@ -30,7 +30,7 @@ def train_epoch(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f}"),
     )
     for i, seq in enumerate(bar):
         seq = seq.to(device)
@@ -58,7 +58,7 @@ def train_epoch(
                 )
             )
             bar.set_description(
-                f"Training | Epoch: {epoch} | " f"Loss: {running_loss:.4f} | "
+                f"Training | Epoch: {epoch} | " f"Loss: {running_loss:.4f}"
             )
             running_loss = 0
 
@@ -76,26 +76,16 @@ def eval_epoch(
     wandb_log: Callable[[dict[str, float, int]], None],
     epoch: int,
     device: torch.device,
-) -> tuple[float, float]:
-    """
-    Perform a single evaluation iteration.
-
-    Args:
-        model (Conv2dEIRNN): The model to be evaluated.
-        criterion (torch.nn.Module): The loss function.
-        test_loader (torch.utils.data.DataLoader): The test data loader.
-        wandb_log (function): Function to log evaluation statistics to Weights & Biases.
-        epoch (int): The current epoch number.
-        device (torch.device): The device to perform computations on.
-
-    Returns:
-        tuple: A tuple containing the test loss and accuracy.
-    """
+) -> float:
     model.eval()
     test_loss = 0.0
+    bar = tqdm(
+        test_loader,
+        desc=(f"Testing | Epoch: {epoch}"),
+    )
 
     with torch.no_grad():
-        for seq in test_loader:
+        for seq in bar:
             seq = seq.to(device)
 
             # Forward pass
@@ -120,6 +110,7 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    torch.set_float32_matmul_precision(config.train.matmul_precision)
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TransformerDecoder(**config.model).to(device)
@@ -148,7 +139,9 @@ def train(config: AttrDict) -> None:
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     # Initialize the loss function
     if config.criterion == "mse_loss":
@@ -157,7 +150,9 @@ def train(config: AttrDict) -> None:
         mse_loss = torch.nn.MSELoss()
         criterion = lambda x: torch.sqrt(mse_loss(x))
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     # Get the data loaders
     train_dataset = StockDataset(**config.dataset, train=True)
@@ -179,7 +174,7 @@ def train(config: AttrDict) -> None:
 
     for epoch in range(config.train.epochs):
         # Train the model
-        train_loss, train_acc = train_epoch(
+        train_loss = train_epoch(
             config,
             model,
             optimizer,
@@ -190,8 +185,8 @@ def train(config: AttrDict) -> None:
             device,
         )
 
-        # Evaluate the model on the test set
-        test_loss, test_acc = eval_epoch(
+        # # Evaluate the model on the test set
+        test_loss = eval_epoch(
             model, criterion, test_loader, wandb_log, epoch, device
         )
 
@@ -199,16 +194,16 @@ def train(config: AttrDict) -> None:
         print(
             f"Epoch [{epoch}/{config.train.epochs}] | "
             f"Train Loss: {train_loss:.4f} | "
-            f"Train Accuracy: {train_acc:.2%} | "
             f"Test Loss: {test_loss:.4f}, "
-            f"Test Accuracy: {test_acc:.2%}"
         )
 
         # Save Model
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)
