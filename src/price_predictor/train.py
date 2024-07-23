@@ -1,9 +1,7 @@
 import os
-from typing import Callable, Optional
+from typing import Callable
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import wandb
 from model import TransformerDecoder
 from torch.utils.data import DataLoader
@@ -26,7 +24,6 @@ def train_epoch(
     model.train()
     train_loss = 0.0
     running_loss = 0.0
-    running_correct = 0
 
     bar = tqdm(
         train_loader,
@@ -37,12 +34,14 @@ def train_epoch(
 
         # Forward pass
         outputs = model(seq)
-        loss = criterion(outputs, seq)
+        loss = criterion(
+            outputs[:, :-1, ...],
+            seq[:, 1:, ...],
+        )
 
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-
         optimizer.step()
 
         # Update statistics
@@ -70,6 +69,7 @@ def train_epoch(
 
 
 def eval_epoch(
+    config: AttrDict,
     model: TransformerDecoder,
     criterion: torch.nn.Module,
     test_loader: DataLoader,
@@ -90,7 +90,10 @@ def eval_epoch(
 
             # Forward pass
             outputs = model(seq)
-            loss = criterion(outputs, seq)
+            loss = criterion(
+                outputs[:, :-1, ...],
+                seq[:, 1:, ...],
+            )
 
             # Update statistics
             test_loss += loss.item()
@@ -110,6 +113,8 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    os.makedirs(config.train.checkpoint_dir, exist_ok=True)
+
     torch.set_float32_matmul_precision(config.train.matmul_precision)
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,10 +143,14 @@ def train(config: AttrDict) -> None:
             lr=config.optimizer.lr,
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
-    else:
-        raise NotImplementedError(
-            f"Optimizer {config.optimizer.fn} not implemented"
+    elif config.optimizer.fn == "adamw":
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=config.optimizer.lr,
+            betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
+    else:
+        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
 
     # Initialize the loss function
     if config.criterion == "mse_loss":
@@ -150,9 +159,7 @@ def train(config: AttrDict) -> None:
         mse_loss = torch.nn.MSELoss()
         criterion = lambda x: torch.sqrt(mse_loss(x))
     else:
-        raise NotImplementedError(
-            f"Criterion {config.criterion} not implemented"
-        )
+        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
     train_dataset = StockDataset(**config.dataset, train=True)
@@ -185,9 +192,9 @@ def train(config: AttrDict) -> None:
             device,
         )
 
-        # # Evaluate the model on the test set
+        # Evaluate the model on the test set
         test_loss = eval_epoch(
-            model, criterion, test_loader, wandb_log, epoch, device
+            config, model, criterion, test_loader, wandb_log, epoch, device
         )
 
         # Print the epoch statistics
@@ -199,12 +206,17 @@ def train(config: AttrDict) -> None:
 
         # Save Model
         file_path = os.path.abspath(
-            os.path.join(config.train.model_dir, f"model_{epoch}.pt")
+            os.path.join(config.train.checkpoint_dir, f"checkpoint_{epoch}.pt")
         )
         link_path = os.path.abspath(
-            os.path.join(config.train.model_dir, "model.pt")
+            os.path.join(config.train.checkpoint_dir, "checkpoint.pt")
         )
-        torch.save(model, file_path)
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": getattr(model, "_orig_mod", model).state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        torch.save(checkpoint, file_path)
         try:
             os.remove(link_path)
         except FileNotFoundError:
