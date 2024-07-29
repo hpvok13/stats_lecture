@@ -9,7 +9,13 @@ from utils import get_activation_class
 
 class FeedForward(nn.Module):
     def __init__(
-        self, in_dim, hidden_dim, out_dim, activation="gelu", bias=True, do_ln=True
+        self,
+        in_dim,
+        hidden_dim,
+        out_dim,
+        activation="gelu",
+        bias=True,
+        do_ln=True,
     ):
         super().__init__()
         self.norm = nn.LayerNorm(in_dim) if do_ln else nn.Identity()
@@ -35,7 +41,8 @@ class PositionalEmbedding(nn.Module):
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(
-            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
+            torch.arange(0, d_model, 2).float()
+            * (-math.log(10000.0) / d_model)
         )
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -43,7 +50,12 @@ class PositionalEmbedding(nn.Module):
         self.register_buffer("pe", pe)
 
         self.ff = FeedForward(
-            d_model, d_model * 2, d_model, bias=bias, activation=activation, do_ln=False
+            d_model,
+            d_model * 2,
+            d_model,
+            bias=bias,
+            activation=activation,
+            do_ln=False,
         )
 
     def forward(self, x):
@@ -66,8 +78,7 @@ class AttentionBlock(nn.Module):
         super().__init__()
         self.qkv = nn.Linear(d_model, d_model * 3)
         self.register_buffer(
-            "mask",
-            Transformer.generate_square_subsequent_mask(max_len),
+            "mask", Transformer.generate_square_subsequent_mask(max_len)
         )
         self.attention = nn.MultiheadAttention(
             d_model,
@@ -88,9 +99,7 @@ class AttentionBlock(nn.Module):
         x = self.norm1(x)
         q, k, v = self.qkv(x).chunk(3, -1)
         mask = self.mask[: x.shape[0], : x.shape[0]]
-        x, _ = self.attention(
-            q, k, v, need_weights=False, attn_mask=mask, is_causal=True
-        )
+        x, _ = self.attention(q, k, v, need_weights=False, attn_mask=mask)
         x += res
         res = x
         x = self.norm2(x)
@@ -117,7 +126,7 @@ class TransformerDecoder(torch.nn.Module):
         super().__init__()
         self.batch_first = batch_first
 
-        self.proj_in = nn.Linear(input_dim, d_model, bias=False)
+        self.proj_in = nn.Linear(input_dim, d_model, bias=bias)
 
         self.pos_embed = PositionalEmbedding(
             d_model, max_len, dropout, bias, activation
@@ -138,7 +147,7 @@ class TransformerDecoder(torch.nn.Module):
         ]
         self.attn = nn.Sequential(*self.attn)
 
-        self.proj_out = FeedForward(d_model, ff_dim, input_dim, activation, do_ln=False)
+        self.proj_out = nn.Linear(d_model, input_dim, bias=bias)
 
     def forward(self, x):
         if self.batch_first:
