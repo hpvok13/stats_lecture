@@ -27,7 +27,7 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: mse_loss
-wandb: True
+wandb: False
 compile:
   disable: True
   fullgraph: True
